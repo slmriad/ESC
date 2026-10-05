@@ -178,19 +178,41 @@
       items.forEach(el => el.classList.add("visible"));
       return;
     }
-    const observer = new IntersectionObserver((entries, obs) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("visible");
-          obs.unobserve(entry.target);
-        }
-      });
-    }, { threshold: .12, rootMargin: "0px 0px -30px 0px" });
-    items.forEach(el => observer.observe(el));
+    const pending = new Set(items);
+    let fallbackTimer;
+    const revealAll = () => {
+      items.forEach(el => el.classList.add("visible"));
+      pending.clear();
+      clearTimeout(fallbackTimer);
+    };
+    try {
+      const observer = new IntersectionObserver((entries, obs) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("visible");
+            pending.delete(entry.target);
+            obs.unobserve(entry.target);
+          }
+        });
+        if (!pending.size) clearTimeout(fallbackTimer);
+      }, { threshold: .12, rootMargin: "0px 0px -30px 0px" });
+      items.forEach(el => observer.observe(el));
+      document.documentElement.classList.add("reveal-ready");
+      fallbackTimer = setTimeout(revealAll, 4000);
+    } catch {
+      revealAll();
+    }
   }
 
   function initNavigation() {
-    const onScroll = () => navWrap.classList.toggle("scrolled", scrollY > 30);
+    let scrollFrame = 0;
+    const onScroll = () => {
+      if (scrollFrame) return;
+      scrollFrame = requestAnimationFrame(() => {
+        scrollFrame = 0;
+        navWrap.classList.toggle("scrolled", scrollY > 30);
+      });
+    };
     addEventListener("scroll", onScroll, { passive: true });
     onScroll();
 
@@ -288,22 +310,28 @@
 
     let ringX = state.mouse.x;
     let ringY = state.mouse.y;
+    let frame = 0;
 
     addEventListener("mousemove", e => {
       state.mouse.x = e.clientX;
       state.mouse.y = e.clientY;
-      cursorDot.style.left = `${e.clientX}px`;
-      cursorDot.style.top = `${e.clientY}px`;
+      if (!frame) frame = requestAnimationFrame(update);
     }, { passive: true });
 
-    const loop = () => {
+    const update = () => {
+      frame = 0;
+      const x = state.mouse.x;
+      const y = state.mouse.y;
+      cursorDot.style.left = `${x}px`;
+      cursorDot.style.top = `${y}px`;
       ringX += (state.mouse.x - ringX) * .12;
       ringY += (state.mouse.y - ringY) * .12;
       cursorRing.style.left = `${ringX}px`;
       cursorRing.style.top = `${ringY}px`;
-      requestAnimationFrame(loop);
+      if (Math.abs(x - ringX) > .5 || Math.abs(y - ringY) > .5) {
+        frame = requestAnimationFrame(update);
+      }
     };
-    loop();
 
     const interactive = "a, button, summary, .category, .browser-shell";
     $$(interactive).forEach(el => {
@@ -348,16 +376,6 @@
     gsap.to(".statement-image", {
       yPercent: 10,
       scrollTrigger: { trigger: ".statement", start: "top bottom", end: "bottom top", scrub: true }
-    });
-
-    gsap.utils.toArray(".service-card").forEach((card, i) => {
-      gsap.fromTo(card, { y: 30 }, {
-        y: 0,
-        duration: .8,
-        ease: "power3.out",
-        scrollTrigger: { trigger: card, start: "top 90%" },
-        delay: i % 3 * .06
-      });
     });
 
     gsap.utils.toArray(".process-item").forEach(item => {
@@ -406,53 +424,81 @@
     const canvas = document.getElementById("ambientCanvas");
     if (!canvas || state.reducedMotion) return;
     const ctx = canvas.getContext("2d", { alpha: true });
-    let w = 0, h = 0, dpr = 1, raf = 0, t = 0;
-    const points = Array.from({ length: 26 }, (_, i) => ({
-      x: Math.random(), y: Math.random(), r: 0.6 + Math.random() * 1.8,
-      a: .08 + Math.random() * .18, speed: .00008 + Math.random() * .00012,
-      phase: Math.random() * Math.PI * 2
-    }));
+    let w = 0, h = 0, dpr = 1, raf = 0, t = 0, lastDraw = 0;
+    let points = [], positions = [];
+    const mobile = matchMedia("(max-width: 760px), (pointer: coarse)");
     function resize(){
-      dpr = Math.min(devicePixelRatio || 1, 1.6); w = innerWidth; h = innerHeight;
-      canvas.width = Math.floor(w*dpr); canvas.height = Math.floor(h*dpr);
-      canvas.style.width = w+"px"; canvas.style.height = h+"px";
+      dpr = Math.min(devicePixelRatio || 1, mobile.matches ? 1 : 1.4); w = innerWidth; h = innerHeight;
+      const width = Math.floor(w*dpr), height = Math.floor(h*dpr);
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width; canvas.height = height;
+      }
       ctx.setTransform(dpr,0,0,dpr,0,0);
+      points = Array.from({ length: mobile.matches ? 10 : 20 }, () => ({
+        x: Math.random(), y: Math.random(), r: 0.6 + Math.random() * 1.8,
+        a: .08 + Math.random() * .18, speed: .00008 + Math.random() * .00012,
+        phase: Math.random() * Math.PI * 2
+      }));
+      positions = points.map(() => ({ x: 0, y: 0 }));
+      if (!raf && !document.hidden) raf = requestAnimationFrame(draw);
     }
-    function draw(){
-      t += 1; ctx.clearRect(0,0,w,h);
+    function draw(now){
+      raf = 0;
+      if (document.hidden) return;
+      if (now - lastDraw < 1000 / 30) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
+      const delta = lastDraw ? Math.min(now - lastDraw, 50) : 1000 / 30;
+      lastDraw = now;
+      t += delta / (1000 / 60);
+      ctx.clearRect(0,0,w,h);
       const mx = state.mouse.x || w*.5, my = state.mouse.y || h*.4;
       const g = ctx.createRadialGradient(mx,my,0,mx,my,Math.max(w,h)*.42);
       g.addColorStop(0,"rgba(217,255,63,.055)"); g.addColorStop(.45,"rgba(70,88,255,.022)"); g.addColorStop(1,"rgba(0,0,0,0)");
       ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
       ctx.lineWidth=.55;
+      points.forEach((p, i) => {
+        positions[i].x=(p.x*w + Math.sin(t*p.speed*60+p.phase)*55 + t*p.speed*w)%(w+120)-60;
+        positions[i].y=p.y*h + Math.cos(t*p.speed*45+p.phase)*38;
+      });
       for(let i=0;i<points.length;i++){
         const p=points[i];
-        const x=(p.x*w + Math.sin(t*p.speed*60+p.phase)*55 + t*p.speed*w)%(w+120)-60;
-        const y=p.y*h + Math.cos(t*p.speed*45+p.phase)*38;
+        const {x,y}=positions[i];
         ctx.beginPath(); ctx.arc(x,y,p.r,0,Math.PI*2); ctx.fillStyle=`rgba(217,255,63,${p.a})`; ctx.fill();
         for(let j=i+1;j<points.length;j++){
-          const q=points[j];
-          const qx=(q.x*w + Math.sin(t*q.speed*60+q.phase)*55 + t*q.speed*w)%(w+120)-60;
-          const qy=q.y*h + Math.cos(t*q.speed*45+q.phase)*38;
-          const dx=x-qx,dy=y-qy,dist=Math.hypot(dx,dy);
-          if(dist<145){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(qx,qy);ctx.strokeStyle=`rgba(255,255,255,${(1-dist/145)*.025})`;ctx.stroke();}
+          const q=positions[j];
+          const dx=x-q.x,dy=y-q.y,distSquared=dx*dx+dy*dy;
+          if(distSquared<21025){const dist=Math.sqrt(distSquared);ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(q.x,q.y);ctx.strokeStyle=`rgba(255,255,255,${(1-dist/145)*.025})`;ctx.stroke();}
         }
       }
       raf=requestAnimationFrame(draw);
     }
-    resize(); addEventListener("resize",resize,{passive:true}); draw();
-    document.addEventListener("visibilitychange",()=>{ if(document.hidden){cancelAnimationFrame(raf)} else {draw()} });
+    resize();
+    addEventListener("resize",resize,{passive:true});
+    mobile.addEventListener?.("change",resize);
+    document.addEventListener("visibilitychange",()=>{
+      if(document.hidden){cancelAnimationFrame(raf);raf=0;lastDraw=0;}
+      else if(!raf) raf=requestAnimationFrame(draw);
+    });
   }
 
   function initGlobalPointerLight(){
     if(state.reducedMotion) return;
+    let pointerFrame=0, pointerEvent=null;
     addEventListener("pointermove",e=>{
-      state.mouse.x=e.clientX; state.mouse.y=e.clientY;
-      document.documentElement.style.setProperty("--mx",`${e.clientX}px`);
-      document.documentElement.style.setProperty("--my",`${e.clientY}px`);
+      if(e.pointerType === "touch") return;
+      pointerEvent=e;
+      if(!pointerFrame) pointerFrame=requestAnimationFrame(()=>{
+        pointerFrame=0;
+        state.mouse.x=pointerEvent.clientX; state.mouse.y=pointerEvent.clientY;
+        document.documentElement.style.setProperty("--mx",`${pointerEvent.clientX}px`);
+        document.documentElement.style.setProperty("--my",`${pointerEvent.clientY}px`);
+      });
     },{passive:true});
     const contact=$(".contact");
     contact?.addEventListener("pointermove",e=>{
+      if(e.pointerType === "touch") return;
       const r=contact.getBoundingClientRect();
       contact.style.setProperty("--contact-x",`${e.clientX-r.left}px`);
       contact.style.setProperty("--contact-y",`${e.clientY-r.top}px`);
@@ -461,21 +507,49 @@
 
   function initScrollProgress(){
     const bar=$("#scrollProgress"); if(!bar) return;
+    let frame=0, lastProgress=-1;
     const update=()=>{
+      if(frame) return;
+      frame=requestAnimationFrame(()=>{
+        frame=0;
       const max=document.documentElement.scrollHeight-innerHeight;
       const p=max>0?Math.min(1,Math.max(0,scrollY/max)):0;
-      bar.style.transform=`scaleX(${p})`;
-      document.documentElement.style.setProperty("--scroll",p.toFixed(4));
+        if(Math.abs(p-lastProgress)>.001){
+          bar.style.transform=`scaleX(${p})`;
+          lastProgress=p;
+        }
+      });
     };
     addEventListener("scroll",update,{passive:true}); update();
   }
 
   function initCardSpotlights(){
-    $$(".service-card").forEach(card=>card.addEventListener("pointermove",e=>{
-      const r=card.getBoundingClientRect();
-      card.style.setProperty("--card-x",`${e.clientX-r.left}px`);
-      card.style.setProperty("--card-y",`${e.clientY-r.top}px`);
-    },{passive:true}));
+    $$(".service-card").forEach(card=>{
+      let frame=0, pointer=null;
+      card.addEventListener("pointermove",e=>{
+        pointer=e;
+        if(frame) return;
+        frame=requestAnimationFrame(()=>{
+          frame=0;
+          const rect=card.getBoundingClientRect();
+          card.style.setProperty("--card-x",`${pointer.clientX-rect.left}px`);
+          card.style.setProperty("--card-y",`${pointer.clientY-rect.top}px`);
+        });
+      },{passive:true});
+    });
+  }
+
+  function initMotionVisibility(){
+    const animated=$$(".ambient-orb,.hero-grid,.hero-title .accent,.eyebrow-dot,.marquee-track,.tier-lab");
+    if("IntersectionObserver" in window){
+      const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{
+        entry.target.classList.toggle("motion-paused",!entry.isIntersecting);
+      }),{threshold:0});
+      animated.forEach(element=>observer.observe(element));
+    }
+    const updateVisibility=()=>document.documentElement.classList.toggle("page-hidden",document.hidden);
+    document.addEventListener("visibilitychange",updateVisibility);
+    updateVisibility();
   }
 
   function initAdvancedGSAP(){
@@ -491,7 +565,7 @@
       .to(".hero-copy,.round-link",{y:0,opacity:1,duration:.8,stagger:.1,ease:"power3.out"},"-=.55");
 
     gsap.to(".hero-title",{yPercent:-10,scale:.965,opacity:.42,ease:"none",scrollTrigger:{trigger:".hero",start:"top top",end:"bottom top",scrub:true}});
-    gsap.to(".hero-grid",{backgroundPosition:"144px 220px",scale:1.08,ease:"none",scrollTrigger:{trigger:".hero",start:"top top",end:"bottom top",scrub:true}});
+    gsap.to(".hero-grid",{scale:1.08,ease:"none",scrollTrigger:{trigger:".hero",start:"top top",end:"bottom top",scrub:true}});
 
     // Big editorial headings reveal with blur + rise.
     gsap.utils.toArray(".display,.statement-title,.contact-title").forEach(el=>{
@@ -501,11 +575,6 @@
     // Browser mockup pins visually with a cinematic entrance and depth.
     gsap.fromTo(".browser-shell",{y:90,rotateX:8,rotateY:-7,scale:.91,opacity:0},{y:0,rotateX:0,rotateY:0,scale:1,opacity:1,duration:1.25,ease:"power4.out",scrollTrigger:{trigger:".demo-panel",start:"top 82%",once:true}});
     gsap.to(".browser-shell",{y:-45,ease:"none",scrollTrigger:{trigger:".build",start:"top bottom",end:"bottom top",scrub:1.1}});
-
-    // Service cards cascade.
-    gsap.utils.toArray(".service-card").forEach((card,i)=>{
-      gsap.from(card,{y:70,opacity:0,rotateX:7,duration:.9,delay:(i%3)*.07,ease:"power3.out",scrollTrigger:{trigger:card,start:"top 92%",once:true}});
-    });
 
     // Statement image zooms out while text stays grounded.
     gsap.fromTo(".statement-image",{scale:1.18,filter:"brightness(.72)"},{scale:1.04,filter:"brightness(1)",ease:"none",scrollTrigger:{trigger:".statement",start:"top bottom",end:"bottom top",scrub:true}});
@@ -562,6 +631,7 @@
   initTierLab();
   initLoader();
     initAmbientCanvas();
+    initMotionVisibility();
     initGlobalPointerLight();
     initScrollProgress();
     initCardSpotlights();
