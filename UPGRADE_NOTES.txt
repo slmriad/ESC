@@ -1,0 +1,24 @@
+ESC ULTRA MOTION UPGRADE
+
+Main upgrades:
+- Animated procedural background canvas
+- Cursor-reactive ambient spotlight
+- Floating gradient/orb background
+- Animated hero grid
+- Scroll progress indicator
+- Cinematic GSAP hero entrance
+- Scroll-linked parallax
+- Browser mockup 3D motion
+- Hover-reactive service cards
+- Animated category previews
+- Statement image zoom/parallax
+- Process timeline motion
+- Kinetic contact-section glow
+- Reduced-motion accessibility support
+- Real ESC Gmail address wired into the contact button
+
+To update the live site:
+1. Replace the current GitHub repository files with the files in this folder.
+2. Keep the same folder structure: css/, js/, demos/.
+3. Commit to main.
+4. GitHub Pages will redeploy automatically.

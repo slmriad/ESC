@@ -261,7 +261,7 @@
       kicker.textContent = data.kicker;
       headline.textContent = data.headline.replace(/\\n/g, "\n");
       small.textContent = data.small;
-      if (demoOpen) demoOpen.href = `demos/${type}.html`;
+      if (demoOpen) demoOpen.href = `demos/${type}.html?tier=${document.documentElement.dataset.demoTier || "business"}`;
       features.innerHTML = data.features.map(feature => `<li>${feature}</li>`).join("");
       hero.style.backgroundImage = `url("${data.image}")`;
 
@@ -399,8 +399,172 @@
     if (year) year.textContent = new Date().getFullYear();
   }
 
+
+
+  // ===== ESC CINEMATIC MOTION ENGINE =====
+  function initAmbientCanvas() {
+    const canvas = document.getElementById("ambientCanvas");
+    if (!canvas || state.reducedMotion) return;
+    const ctx = canvas.getContext("2d", { alpha: true });
+    let w = 0, h = 0, dpr = 1, raf = 0, t = 0;
+    const points = Array.from({ length: 26 }, (_, i) => ({
+      x: Math.random(), y: Math.random(), r: 0.6 + Math.random() * 1.8,
+      a: .08 + Math.random() * .18, speed: .00008 + Math.random() * .00012,
+      phase: Math.random() * Math.PI * 2
+    }));
+    function resize(){
+      dpr = Math.min(devicePixelRatio || 1, 1.6); w = innerWidth; h = innerHeight;
+      canvas.width = Math.floor(w*dpr); canvas.height = Math.floor(h*dpr);
+      canvas.style.width = w+"px"; canvas.style.height = h+"px";
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+    }
+    function draw(){
+      t += 1; ctx.clearRect(0,0,w,h);
+      const mx = state.mouse.x || w*.5, my = state.mouse.y || h*.4;
+      const g = ctx.createRadialGradient(mx,my,0,mx,my,Math.max(w,h)*.42);
+      g.addColorStop(0,"rgba(217,255,63,.055)"); g.addColorStop(.45,"rgba(70,88,255,.022)"); g.addColorStop(1,"rgba(0,0,0,0)");
+      ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+      ctx.lineWidth=.55;
+      for(let i=0;i<points.length;i++){
+        const p=points[i];
+        const x=(p.x*w + Math.sin(t*p.speed*60+p.phase)*55 + t*p.speed*w)%(w+120)-60;
+        const y=p.y*h + Math.cos(t*p.speed*45+p.phase)*38;
+        ctx.beginPath(); ctx.arc(x,y,p.r,0,Math.PI*2); ctx.fillStyle=`rgba(217,255,63,${p.a})`; ctx.fill();
+        for(let j=i+1;j<points.length;j++){
+          const q=points[j];
+          const qx=(q.x*w + Math.sin(t*q.speed*60+q.phase)*55 + t*q.speed*w)%(w+120)-60;
+          const qy=q.y*h + Math.cos(t*q.speed*45+q.phase)*38;
+          const dx=x-qx,dy=y-qy,dist=Math.hypot(dx,dy);
+          if(dist<145){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(qx,qy);ctx.strokeStyle=`rgba(255,255,255,${(1-dist/145)*.025})`;ctx.stroke();}
+        }
+      }
+      raf=requestAnimationFrame(draw);
+    }
+    resize(); addEventListener("resize",resize,{passive:true}); draw();
+    document.addEventListener("visibilitychange",()=>{ if(document.hidden){cancelAnimationFrame(raf)} else {draw()} });
+  }
+
+  function initGlobalPointerLight(){
+    if(state.reducedMotion) return;
+    addEventListener("pointermove",e=>{
+      state.mouse.x=e.clientX; state.mouse.y=e.clientY;
+      document.documentElement.style.setProperty("--mx",`${e.clientX}px`);
+      document.documentElement.style.setProperty("--my",`${e.clientY}px`);
+    },{passive:true});
+    const contact=$(".contact");
+    contact?.addEventListener("pointermove",e=>{
+      const r=contact.getBoundingClientRect();
+      contact.style.setProperty("--contact-x",`${e.clientX-r.left}px`);
+      contact.style.setProperty("--contact-y",`${e.clientY-r.top}px`);
+    },{passive:true});
+  }
+
+  function initScrollProgress(){
+    const bar=$("#scrollProgress"); if(!bar) return;
+    const update=()=>{
+      const max=document.documentElement.scrollHeight-innerHeight;
+      const p=max>0?Math.min(1,Math.max(0,scrollY/max)):0;
+      bar.style.transform=`scaleX(${p})`;
+      document.documentElement.style.setProperty("--scroll",p.toFixed(4));
+    };
+    addEventListener("scroll",update,{passive:true}); update();
+  }
+
+  function initCardSpotlights(){
+    $$(".service-card").forEach(card=>card.addEventListener("pointermove",e=>{
+      const r=card.getBoundingClientRect();
+      card.style.setProperty("--card-x",`${e.clientX-r.left}px`);
+      card.style.setProperty("--card-y",`${e.clientY-r.top}px`);
+    },{passive:true}));
+  }
+
+  function initAdvancedGSAP(){
+    if(!window.gsap || state.reducedMotion) return;
+    gsap.registerPlugin(ScrollTrigger);
+
+    // Cinematic hero entrance after loader.
+    gsap.set(".hero-title .line",{yPercent:115,rotateX:-12,opacity:0,filter:"blur(10px)"});
+    gsap.set(".hero-copy,.round-link,.hero .eyebrow",{y:24,opacity:0});
+    const heroTl=gsap.timeline({delay:1.55});
+    heroTl.to(".hero .eyebrow",{y:0,opacity:1,duration:.7,ease:"power3.out"})
+      .to(".hero-title .line",{yPercent:0,rotateX:0,opacity:1,filter:"blur(0px)",duration:1.15,stagger:.12,ease:"power4.out"},"-=.35")
+      .to(".hero-copy,.round-link",{y:0,opacity:1,duration:.8,stagger:.1,ease:"power3.out"},"-=.55");
+
+    gsap.to(".hero-title",{yPercent:-10,scale:.965,opacity:.42,ease:"none",scrollTrigger:{trigger:".hero",start:"top top",end:"bottom top",scrub:true}});
+    gsap.to(".hero-grid",{backgroundPosition:"144px 220px",scale:1.08,ease:"none",scrollTrigger:{trigger:".hero",start:"top top",end:"bottom top",scrub:true}});
+
+    // Big editorial headings reveal with blur + rise.
+    gsap.utils.toArray(".display,.statement-title,.contact-title").forEach(el=>{
+      gsap.fromTo(el,{y:65,opacity:0,filter:"blur(12px)"},{y:0,opacity:1,filter:"blur(0px)",duration:1.15,ease:"power4.out",scrollTrigger:{trigger:el,start:"top 88%",once:true}});
+    });
+
+    // Browser mockup pins visually with a cinematic entrance and depth.
+    gsap.fromTo(".browser-shell",{y:90,rotateX:8,rotateY:-7,scale:.91,opacity:0},{y:0,rotateX:0,rotateY:0,scale:1,opacity:1,duration:1.25,ease:"power4.out",scrollTrigger:{trigger:".demo-panel",start:"top 82%",once:true}});
+    gsap.to(".browser-shell",{y:-45,ease:"none",scrollTrigger:{trigger:".build",start:"top bottom",end:"bottom top",scrub:1.1}});
+
+    // Service cards cascade.
+    gsap.utils.toArray(".service-card").forEach((card,i)=>{
+      gsap.from(card,{y:70,opacity:0,rotateX:7,duration:.9,delay:(i%3)*.07,ease:"power3.out",scrollTrigger:{trigger:card,start:"top 92%",once:true}});
+    });
+
+    // Statement image zooms out while text stays grounded.
+    gsap.fromTo(".statement-image",{scale:1.18,filter:"brightness(.72)"},{scale:1.04,filter:"brightness(1)",ease:"none",scrollTrigger:{trigger:".statement",start:"top bottom",end:"bottom top",scrub:true}});
+    gsap.to(".statement-title",{xPercent:5,ease:"none",scrollTrigger:{trigger:".statement",start:"top bottom",end:"bottom top",scrub:true}});
+
+    // Process rows reveal like a timeline.
+    gsap.utils.toArray(".process-item").forEach((row,i)=>{
+      gsap.from(row,{x:-70,opacity:0,duration:.9,delay:(i%2)*.04,ease:"power4.out",scrollTrigger:{trigger:row,start:"top 90%",once:true}});
+    });
+
+    // Contact section scales into the viewport.
+    gsap.from(".contact-inner",{scale:.94,y:70,opacity:0,duration:1.2,ease:"power4.out",scrollTrigger:{trigger:".contact",start:"top 78%",once:true}});
+  }
+
+  function initCategoryAutoPreview(){
+    if(state.reducedMotion || innerWidth<900) return;
+    const buttons=$$(".category");
+    buttons.forEach(btn=>{
+      btn.addEventListener("mouseenter",()=>updateBusiness(btn.dataset.type));
+    });
+  }
+
   function initPage() {
-    initLoader();
+    
+  function initTierLab(){
+    const tierButtons = $$("#tierSwitch [data-tier]");
+    const open = $("#demoOpen");
+    const title = $("#tierLabTitle");
+    const text = $("#tierLabText");
+    const descriptions = {
+      basic: ["BASIC","A sharp, focused website with the essentials done properly — clean design, mobile-ready and fast to understand."],
+      business: ["BUSINESS","A complete, conversion-focused website with richer sections, motion and stronger storytelling."],
+      premium: ["PREMIUM","The flagship experience — cinematic motion, editorial layouts, deeper storytelling and high-end interactive detail."]
+    };
+    let tier = "business";
+    const sync = () => {
+      const activeCategory = $(".category.active");
+      const type = activeCategory?.dataset.type || "restaurant";
+      if(open) open.href = `demos/${type}.html?tier=${tier}`;
+      if(title) title.textContent = descriptions[tier][0];
+      if(text) text.textContent = descriptions[tier][1];
+      tierButtons.forEach(b=>b.classList.toggle("active", b.dataset.tier===tier));
+      document.documentElement.dataset.demoTier = tier;
+      if(window.gsap && !state.reducedMotion){
+        gsap.fromTo(".tier-lab-copy strong",{y:10,opacity:.25},{y:0,opacity:1,duration:.35,ease:"power2.out"});
+        gsap.fromTo("#browserShell",{scale:.985,filter:"brightness(.8)"},{scale:1,filter:"brightness(1)",duration:.5,ease:"power3.out"});
+      }
+    };
+    tierButtons.forEach(b=>b.addEventListener("click",()=>{tier=b.dataset.tier;sync()}));
+    $$(".category").forEach(b=>b.addEventListener("click",()=>requestAnimationFrame(sync)));
+    sync();
+  }
+
+  initTierLab();
+  initLoader();
+    initAmbientCanvas();
+    initGlobalPointerLight();
+    initScrollProgress();
+    initCardSpotlights();
     initReveal();
     initNavigation();
     initSmoothAnchors();
@@ -408,6 +572,8 @@
     initCursor();
     initMagnetic();
     initGSAP();
+    initAdvancedGSAP();
+    initCategoryAutoPreview();
     initParallaxCards();
     initKeyboard();
     initYear();

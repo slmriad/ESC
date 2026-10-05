@@ -19,7 +19,15 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <div class="ambient-stage" aria-hidden="true">
+    <canvas id="ambientCanvas"></canvas>
+    <div class="ambient-orb ambient-orb-a"></div>
+    <div class="ambient-orb ambient-orb-b"></div>
+    <div class="ambient-orb ambient-orb-c"></div>
+    <div class="ambient-vignette"></div>
+  </div>
   <div class="noise" aria-hidden="true"></div>
+  <div class="scroll-progress" aria-hidden="true"><span id="scrollProgress"></span></div>
   <div class="cursor-dot" aria-hidden="true"></div>
   <div class="cursor-ring" aria-hidden="true"></div>
 
@@ -50,7 +58,7 @@
   </header>
 
   <main>
-    <section class="hero section" id="home">
+    <section class="hero section" id="home" data-scene="hero">
       <div class="hero-grid"></div>
       <div class="hero-glow hero-glow-a"></div>
       <div class="hero-glow hero-glow-b"></div>
@@ -75,7 +83,7 @@
       </div>
     </section>
 
-    <section class="intro section">
+    <section class="intro section" data-scene="intro">
       <div class="container intro-grid">
         <div class="section-label reveal">01 / THE IDEA</div>
         <div>
@@ -90,11 +98,23 @@
       </div>
     </section>
 
-    <section class="build section" id="build">
+    <section class="build section" id="build" data-scene="build">
       <div class="container">
         <div class="section-head reveal">
           <div class="section-label">02 / WHAT WE BUILD</div>
-          <p>Pick a business type. See the kind of experience we can create for it.</p>
+          <p>Pick a business type, then choose the level. Every package is a real step up — not the same template with a different label.</p>
+        </div>
+        <div class="tier-lab reveal" aria-label="Choose website level">
+          <div class="tier-lab-copy">
+            <span class="tier-lab-kicker">CHOOSE THE BUILD LEVEL</span>
+            <strong id="tierLabTitle">BUSINESS</strong>
+            <p id="tierLabText">A complete, conversion-focused website with richer sections, motion and stronger storytelling.</p>
+          </div>
+          <div class="tier-switch" id="tierSwitch">
+            <button data-tier="basic"><span>01</span><b>BASIC</b><small>Clean & focused</small></button>
+            <button class="active" data-tier="business"><span>02</span><b>BUSINESS</b><small>Full experience</small></button>
+            <button data-tier="premium"><span>03</span><b>PREMIUM</b><small>Flagship build</small></button>
+          </div>
         </div>
         <div class="build-layout">
           <aside class="category-list" id="categoryList">
@@ -117,7 +137,7 @@
               <p id="demoDescription">Show the food. Tell the story. Make booking a table feel effortless.</p>
               <ul id="demoFeatures"></ul>
               <div class="demo-actions">
-                <a id="demoOpen" href="demos/restaurant.html" class="text-link magnetic">Open full demo <span>↗</span></a>
+                <a id="demoOpen" href="demos/restaurant.html?tier=business" class="text-link magnetic">Open full demo <span>↗</span></a>
                 <a href="#contact" class="text-link magnetic">Build this for my business <span>↗</span></a>
               </div>
             </div>
@@ -148,7 +168,7 @@
       </div>
     </section>
 
-    <section class="services section" id="services">
+    <section class="services section" id="services" data-scene="services">
       <div class="container">
         <div class="section-head reveal">
           <div class="section-label">03 / SERVICES</div>
@@ -175,7 +195,7 @@
       </div>
     </section>
 
-    <section class="process section" id="process">
+    <section class="process section" id="process" data-scene="process">
       <div class="container">
         <div class="section-head reveal">
           <div class="section-label">05 / PROCESS</div>
@@ -190,7 +210,7 @@
       </div>
     </section>
 
-    <section class="faq section">
+    <section class="faq section" data-scene="faq">
       <div class="container faq-grid">
         <div>
           <div class="section-label reveal">06 / FAQ</div>
@@ -206,7 +226,7 @@
       </div>
     </section>
 
-    <section class="contact section" id="contact">
+    <section class="contact section" id="contact" data-scene="contact">
       <div class="container contact-inner">
         <div class="section-label reveal">07 / START A PROJECT</div>
         <h2 class="contact-title reveal">LET'S MAKE<br><em>YOUR SITE.</em></h2>
@@ -214,10 +234,27 @@
         <div class="contact-actions reveal delay-2">
           <a class="contact-button magnetic" href="https://wa.me/201223451771" target="_blank" rel="noopener noreferrer"><span>WhatsApp</span><b>↗</b></a>
           <a class="contact-button magnetic" href="mailto:egyptsitecreation@gmail.com"><span>Email</span><b>↗</b></a>
-        </d
+        </div>
       </div>
     </section>
-  </main>
+  
+  <section class="esc-contact-rail" aria-label="ESC contact and social links">
+    <div class="container esc-contact-rail-inner">
+      <div class="esc-contact-brand">
+        <span class="eyebrow">CONNECT WITH ESC</span>
+        <h2>LET'S BUILD<br>SOMETHING <em>GOOD.</em></h2>
+      </div>
+      <div class="esc-contact-links">
+        <a href="mailto:egyptsitecreation@gmail.com"><span>EMAIL</span><strong>egyptsitecreation@gmail.com</strong><b>↗</b></a>
+        <a href="tel:+201223451771"><span>PHONE</span><strong>01223451771</strong><b>↗</b></a>
+        <a href="https://www.instagram.com/egyptsitecreation/" target="_blank" rel="noopener noreferrer"><span>INSTAGRAM</span><strong>@egyptsitecreation</strong><b>↗</b></a>
+        <a href="https://www.tiktok.com/@egyptsitecreation" target="_blank" rel="noopener noreferrer"><span>TIKTOK</span><strong>@egyptsitecreation</strong><b>↗</b></a>
+        <a href="https://wa.me/201223451771" target="_blank" rel="noopener noreferrer"><span>WHATSAPP</span><strong>START A CHAT</strong><b>↗</b></a>
+      </div>
+    </div>
+  </section>
+
+</main>
 
   <footer class="footer">
     <div class="container footer-top">
@@ -226,7 +263,13 @@
       <div class="footer-social"><a href="#contact">Start a project ↗</a></div>
     </div>
     <div class="container footer-bottom"><span>© <span id="year"></span> ESC — Egypt Site Creation</span><a href="#top">Back to top ↑</a></div>
-  </footer>
+  <div class="esc-footer-socials">
+<a href="https://www.instagram.com/egyptsitecreation/" target="_blank" rel="noopener noreferrer">Instagram ↗</a>
+<a href="https://www.tiktok.com/@egyptsitecreation" target="_blank" rel="noopener noreferrer">TikTok ↗</a>
+<a href="mailto:egyptsitecreation@gmail.com">Email ↗</a>
+<a href="tel:+201223451771">Call ↗</a>
+</div>
+</footer>
 
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
